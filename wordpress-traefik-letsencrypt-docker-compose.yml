@@ -30,6 +30,12 @@ services:
       MYSQL_PASSWORD: zi4viuWY9kqkAABab6BQ
       # MySQL root password (replace with yours)
       MYSQL_ROOT_PASSWORD: Ldcb3wPGBPqAg2ank3VG
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
 
   wordpress:
@@ -64,8 +70,10 @@ services:
       - "traefik.http.middlewares.compresstraefik.compress=true"
     restart: unless-stopped
     depends_on:
-      - mysql
-      - traefik
+      mysql:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
 
   traefik:
     # Image tag (replace with yours)
