@@ -4,7 +4,7 @@ Install Docker Engine and Docker Compose by following my [guide](https://www.hey
 
 Deploy WordPress server with a Docker Compose using the command:
 
-`docker-compose -f wordpress-traefik-letsencrypt-docker-compose.yml -p wordpress up -d`
+`docker compose -f wordpress-traefik-letsencrypt-docker-compose.yml -p wordpress up -d`
 
 # Author
 hey, I’m Vladimir Mikhalev, but my friends call me Valdemar.
