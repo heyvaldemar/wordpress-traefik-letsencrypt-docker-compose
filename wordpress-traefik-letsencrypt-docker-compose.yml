@@ -27,7 +27,7 @@
 # Install Docker Engine and Docker Compose by following my guide: https://www.heyvaldemar.com/install-docker-engine-and-docker-compose-on-ubuntu-server/
 
 # Deploy WordPress server with a Docker Compose using the command:
-# docker-compose -f wordpress-traefik-letsencrypt-docker-compose.yml -p wordpress up -d
+# docker compose -f wordpress-traefik-letsencrypt-docker-compose.yml -p wordpress up -d
 
 volumes:
   mysql-data:
