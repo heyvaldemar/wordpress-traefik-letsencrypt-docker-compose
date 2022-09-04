@@ -6,6 +6,9 @@ Deploy WordPress server with a Docker Compose using the command:
 
 `docker compose -f wordpress-traefik-letsencrypt-docker-compose.yml -p wordpress up -d`
 
+# Infrastructure Model
+![Infrastructure model](.infragenie/infrastructure_model.png)
+
 # Author
 hey, I’m Vladimir Mikhalev, but my friends call me Valdemar.
 
