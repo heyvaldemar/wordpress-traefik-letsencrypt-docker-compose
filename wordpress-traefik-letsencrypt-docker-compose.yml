@@ -1,6 +1,6 @@
 # WordPress with Let's Encrypt Using Docker Compose
 
-# The complete installation guide is available on my https://www.heyvaldemar.com/install-wordpress-using-docker-compose/
+# The complete installation guide is available on my website https://www.heyvaldemar.com/install-wordpress-using-docker-compose/
 
 # Change variables in the `.env` to meet your requirements.
 # Note that the `.env` file should be in the same directory as `wordpress-traefik-letsencrypt-docker-compose.yml`.
