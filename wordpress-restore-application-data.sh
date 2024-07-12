@@ -15,7 +15,7 @@
 WORDPRESS_CONTAINER=$(docker ps -aqf "name=wordpress-wordpress")
 WORDPRESS_BACKUPS_CONTAINER=$(docker ps -aqf "name=wordpress-backups")
 BACKUP_PATH="/srv/wordpress-application-data/backups/"
-RESTORE_PATH="/opt/bitnami/wordpress/"
+RESTORE_PATH="/bitnami/wordpress/"
 BACKUP_PREFIX="wordpress-application-data"
 
 echo "--> All available application data backups:"
