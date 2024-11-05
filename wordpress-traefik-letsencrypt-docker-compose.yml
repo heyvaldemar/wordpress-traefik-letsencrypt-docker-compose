@@ -207,6 +207,14 @@ services:
       - "traefik.http.routers.http-catchall.entrypoints=web"
       - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.redirectdomain.rule=Host(`${WORDPRESS_ROOT_DOMAIN}`)"
+      - "traefik.http.routers.redirectdomain.entrypoints=web,websecure"
+      - "traefik.http.routers.redirectdomain.middlewares=redirect-to-www"
+      - "traefik.http.middlewares.redirect-to-www.redirectregex.regex=^https?://(?:www\\.)?${WORDPRESS_ROOT_DOMAIN}(.*)"
+      - "traefik.http.middlewares.redirect-to-www.redirectregex.replacement=https://${TRAEFIK_WORDPRESS_HOSTNAME}$$1"
+      - "traefik.http.middlewares.redirect-to-www.redirectregex.permanent=true"
+      - "traefik.http.routers.redirectdomain.tls=true"
+      - "traefik.http.routers.redirectdomain.tls.certresolver=letsencrypt"
     restart: unless-stopped
 
   backups:
