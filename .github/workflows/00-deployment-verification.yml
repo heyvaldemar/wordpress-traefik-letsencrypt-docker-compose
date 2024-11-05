@@ -29,8 +29,8 @@ jobs:
 
     - name: Modify /etc/hosts for internal routing
       run: |
-        echo "127.0.0.1 wordpress.heyvaldemar.net" | sudo tee -a /etc/hosts
-        echo "127.0.0.1 traefik.wordpress.heyvaldemar.net" | sudo tee -a /etc/hosts
+        echo "127.0.0.1 www.heyvaldemarwp.net" | sudo tee -a /etc/hosts
+        echo "127.0.0.1 traefik.www.heyvaldemarwp.net" | sudo tee -a /etc/hosts
 
     - name: Print Docker Compose services status
       run: docker ps
@@ -38,7 +38,7 @@ jobs:
     - name: Wait for the application to be ready via Traefik
       run: |
         echo "Checking the routing and availability of application via Traefik..."
-        timeout 5m bash -c 'while ! curl -fsSLk "https://wordpress.heyvaldemar.net"; do echo "Waiting for the application to be ready..."; sleep 10; done'
+        timeout 5m bash -c 'while ! curl -fsSLk "https://www.heyvaldemarwp.net"; do echo "Waiting for the application to be ready..."; sleep 10; done'
 
     - name: Inspect Network Configuration
       run: |
