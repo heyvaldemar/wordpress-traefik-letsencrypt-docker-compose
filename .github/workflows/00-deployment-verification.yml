@@ -16,8 +16,8 @@ jobs:
       NETWORK_ONE: wordpress-network
       NETWORK_TWO: traefik-network
       DOCKER_COMPOSE_FILE: wordpress-traefik-letsencrypt-docker-compose.yml
-      APP_HOSTNAME: www.heyvaldemar.net
-      APP_TRAEFIK_HOSTNAME: traefik.www.heyvaldemar.net
+      APP_HOSTNAME: www.heyvaldemarwp.net
+      APP_TRAEFIK_HOSTNAME: traefik.www.heyvaldemarwp.net
       COMPOSE_PROJECT_NAME: wordpress
 
     steps:
