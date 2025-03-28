@@ -108,6 +108,9 @@ services:
       - "--entrypoints.web.address=:80"
       # Define the secure (HTTPS) entry point on port 443
       - "--entrypoints.websecure.address=:443"
+      # HTTP -> HTTPS redirect at entrypoint level (Traefik 3.2+)
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       # Enable the Docker provider to detect containers and their labels
       - "--providers.docker=true"
       # Point Traefik to the Docker socket
@@ -138,7 +141,7 @@ services:
       - "80:80"
       - "443:443"
     healthcheck:
-      test: ["CMD", "wget", "http://localhost:8082/ping","--spider"]
+      test: ["CMD", "wget", "http://localhost:8082/ping", "--spider"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -159,20 +162,15 @@ services:
       - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
       # Pass the original Host header to the backend
       - "traefik.http.services.dashboard.loadbalancer.passhostheader=true"
-      # HTTP -> HTTPS redirect for all hosts
-      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall.entrypoints=web"
-      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      # Domain redirection for WordPress (www and non-www)
+      # Redirect from non-www to www (permanent)
       - "traefik.http.routers.redirect-to-www.rule=Host(`${WORDPRESS_ROOT_DOMAIN}`)"
-      - "traefik.http.routers.redirect-to-www.entrypoints=web,websecure"
-      - "traefik.http.routers.redirect-to-www.middlewares=redirect-to-www"
-      - "traefik.http.middlewares.redirect-to-www.redirectregex.regex=^https?://(?:www\\.)?${WORDPRESS_ROOT_DOMAIN}(.*)"
-      - "traefik.http.middlewares.redirect-to-www.redirectregex.replacement=https://${WORDPRESS_HOSTNAME}$$1"
-      - "traefik.http.middlewares.redirect-to-www.redirectregex.permanent=true"
+      - "traefik.http.routers.redirect-to-www.entrypoints=websecure"
       - "traefik.http.routers.redirect-to-www.tls=true"
       - "traefik.http.routers.redirect-to-www.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.redirect-to-www.middlewares=to-www"
+      - "traefik.http.middlewares.to-www.redirectregex.regex=^https?://${WORDPRESS_ROOT_DOMAIN}(.*)"
+      - "traefik.http.middlewares.to-www.redirectregex.replacement=https://www.${WORDPRESS_ROOT_DOMAIN}$$1"
+      - "traefik.http.middlewares.to-www.redirectregex.permanent=true"
     restart: unless-stopped
 
   backups:
