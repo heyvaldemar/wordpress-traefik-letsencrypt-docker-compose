@@ -1,46 +1,63 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+trap 'echo "[ERR] Line $LINENO"; exit 1' ERR
 
-# # wordpress-restore-database.sh Description
-# This script facilitates the restoration of a database backup.
-# 1. **Identify Containers**: It first identifies the service and backups containers by name, finding the appropriate container IDs.
-# 2. **List Backups**: Displays all available database backups located at the specified backup path.
-# 3. **Select Backup**: Prompts the user to copy and paste the desired backup name from the list to restore the database.
-# 4. **Stop Service**: Temporarily stops the service to ensure data consistency during restoration.
-# 5. **Restore Database**: Executes a sequence of commands to drop the current database, create a new one, and restore it from the selected compressed backup file.
-# 6. **Start Service**: Restarts the service after the restoration is completed.
-# To make the `wordpress-restore-database.shh` script executable, run the following command:
-# `chmod +x wordpress-restore-database.sh`
-# Usage of this script ensures a controlled and guided process to restore the database from an existing backup.
+# --- Configuration ---
+PROJECT=${PROJECT:-wordpress}     # Docker Compose project name
+SVC_DB=${SVC_DB:-mariadb}        # DB service name in docker-compose
+SVC_WP=${SVC_WP:-wordpress}      # WordPress service name
+SVC_BKP=${SVC_BKP:-backups}      # Backups service name
 
-WORDPRESS_CONTAINER=$(docker ps -aqf "name=wordpress-wordpress")
-WORDPRESS_BACKUPS_CONTAINER=$(docker ps -aqf "name=wordpress-backups")
-WORDPRESS_DB_NAME="wordpressdb"
-WORDPRESS_DB_USER=$(docker exec $WORDPRESS_BACKUPS_CONTAINER printenv WORDPRESS_DB_USER)
-MARIADB_PASSWORD=$(docker exec $WORDPRESS_BACKUPS_CONTAINER printenv WORDPRESS_DB_PASSWORD)
-BACKUP_PATH="/srv/wordpress-mariadb/backups/"
+DB_BACKUP_DIR=${DB_BACKUP_DIR:-/srv/wordpress-mariadb/backups}
 
-echo "--> All available database backups:"
+# --- Get container IDs (with fallbacks) ---
+CID_DB=$(docker compose -p "$PROJECT" ps -q "$SVC_DB" || true)
+CID_WP=$(docker compose -p "$PROJECT" ps -q "$SVC_WP" || true)
+CID_BKP=$(docker compose -p "$PROJECT" ps -q "$SVC_BKP" || true)
 
-for entry in $(docker container exec "$WORDPRESS_BACKUPS_CONTAINER" sh -c "ls $BACKUP_PATH")
-do
-  echo "$entry"
-done
+[ -n "$CID_DB" ]  || CID_DB=$(docker ps -qf "name=${PROJECT}-${SVC_DB}")
+[ -n "$CID_WP" ]  || CID_WP=$(docker ps -qf "name=${PROJECT}-${SVC_WP}")
+[ -n "$CID_BKP" ] || CID_BKP=$(docker ps -qf "name=${PROJECT}-${SVC_BKP}")
 
-echo "--> Copy and paste the backup name from the list above to restore database and press [ENTER]"
-echo "--> Example: wordpress-mariadb-backup-YYYY-MM-DD_hh-mm.gz"
-echo -n "--> "
+[ -n "$CID_DB" ]  || { echo "[ERR] DB container not found"; exit 1; }
+[ -n "$CID_WP" ]  || { echo "[ERR] WP container not found"; exit 1; }
+[ -n "$CID_BKP" ] || { echo "[ERR] Backups container not found"; exit 1; }
 
-read SELECTED_DATABASE_BACKUP
+# --- Get DB credentials from the backup container env ---
+DB_NAME=$(docker exec "$CID_BKP" printenv WORDPRESS_DB_NAME)
+DB_USER=$(docker exec "$CID_BKP" printenv WORDPRESS_DB_USER)
+DB_PASS=$(docker exec "$CID_BKP" printenv WORDPRESS_DB_PASSWORD)
 
-echo "--> $SELECTED_DATABASE_BACKUP was selected"
+# --- Show available backups ---
+echo "--> Available DB backups:"
+docker exec "$CID_BKP" sh -lc "ls -1 ${DB_BACKUP_DIR}/*.gz 2>/dev/null || true"
 
-echo "--> Stopping service..."
-docker stop "$WORDPRESS_CONTAINER"
+# --- Ask user which backup to restore ---
+read -r -p "--> Enter backup filename (e.g. wordpress-mariadb-backup-YYYY-MM-DD_hh-mm.gz): " SELECTED
+[ -n "$SELECTED" ] || { echo "[ERR] empty filename"; exit 1; }
 
-echo "--> Restoring database..."
-docker exec "$WORDPRESS_BACKUPS_CONTAINER" sh -c "mariadb -h mariadb -u $WORDPRESS_DB_USER --password=$MARIADB_PASSWORD -e 'DROP DATABASE $WORDPRESS_DB_NAME; CREATE DATABASE $WORDPRESS_DB_NAME;' \
-&& gunzip -c ${BACKUP_PATH}${SELECTED_DATABASE_BACKUP} | mariadb -h mariadb -u $WORDPRESS_DB_USER --password=$MARIADB_PASSWORD $WORDPRESS_DB_NAME"
-echo "--> Database recovery completed..."
+# --- Check file exists ---
+docker exec "$CID_BKP" sh -lc "test -f '${DB_BACKUP_DIR}/${SELECTED}'" || { echo "[ERR] file not found"; exit 1; }
 
-echo "--> Starting service..."
-docker start "$WORDPRESS_CONTAINER"
+# --- Put site into maintenance mode (best effort) ---
+docker exec "$CID_WP" sh -lc "command -v wp >/dev/null && wp maintenance-mode activate || true" || true
+
+# --- Stop WP service before restore ---
+docker compose -p "$PROJECT" stop "$SVC_WP"
+
+# --- Restore database (session-level FK off; no SUPER required) ---
+docker exec -e MYSQL_PWD="$DB_PASS" "$CID_BKP" sh -lc "
+  mariadb -h $SVC_DB -u $DB_USER -e \"DROP DATABASE IF EXISTS \\\`$DB_NAME\\\`; CREATE DATABASE \\\`$DB_NAME\\\`;\"
+  ( echo 'SET FOREIGN_KEY_CHECKS=0;'
+    gunzip -c '${DB_BACKUP_DIR}/${SELECTED}'
+    echo 'SET FOREIGN_KEY_CHECKS=1;' ) \
+  | mariadb -h $SVC_DB -u $DB_USER $DB_NAME --force --max-allowed-packet=256M
+"
+
+# --- Start WP again ---
+docker compose -p "$PROJECT" start "$SVC_WP"
+
+# --- Disable maintenance mode ---
+docker exec "$CID_WP" sh -lc "command -v wp >/dev/null && wp maintenance-mode deactivate || true" || true
+
+echo "--> DB restore completed successfully."
