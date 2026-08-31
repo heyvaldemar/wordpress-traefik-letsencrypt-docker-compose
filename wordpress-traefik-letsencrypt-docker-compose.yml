@@ -1,3 +1,15 @@
+# Image pins live HERE, as interpolation defaults, so `git pull` (or
+# re-downloading this file) delivers the exact version combination this
+# repository has tested — no .env editing required. Setting the matching
+# variable in .env overrides the default for anyone who wants to pin
+# differently; .env itself carries only secrets and deliberate overrides.
+# CI (Trivy scans, check-pin-freshness, the ephemeral test .env) reads
+# the pins from these lines — this block is the single source of truth.
+x-images:
+  traefik: &traefik-image ${TRAEFIK_IMAGE_TAG:-traefik:3.7@sha256:9c2a54d87f76f5c2f5f2682c68394af92fb12c0a2686798d6462a3f84bd78eaf}
+  mariadb: &mariadb-image ${WORDPRESS_MARIADB_IMAGE_TAG:-mariadb:11.4@sha256:611a2fcc5fa7c6ceb8644c6f74b25ede004ff6c3a6b38c8f8c23d3bbf6c26430}
+  wordpress: &wordpress-image ${WORDPRESS_IMAGE_TAG:-wordpress:7.1.0@sha256:5a93c470ae8220fddf71f6ebe3bc94e615ddc2ae4d9810f795b830fb11c41a17}
+
 networks:
   wordpress-network:
     external: true
@@ -14,14 +26,14 @@ volumes:
 
 services:
   mariadb:
-    image: ${WORDPRESS_MARIADB_IMAGE_TAG}
+    image: *mariadb-image
     volumes:
       - mariadb-data:/var/lib/mysql
     environment:
-      MARIADB_DATABASE: ${WORDPRESS_DB_NAME}
-      MARIADB_USER: ${WORDPRESS_DB_USER}
-      MARIADB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      MARIADB_ROOT_PASSWORD: ${WORDPRESS_DB_ADMIN_PASSWORD}
+      MARIADB_DATABASE: ${WORDPRESS_DB_NAME:-wordpressdb}
+      MARIADB_USER: ${WORDPRESS_DB_USER:-wordpressdbbuser}
+      MARIADB_PASSWORD: ${WORDPRESS_DB_PASSWORD:?set in .env - see .env.example for generation command}
+      MARIADB_ROOT_PASSWORD: ${WORDPRESS_DB_ADMIN_PASSWORD:?set in .env - see .env.example for generation command}
     networks:
       - wordpress-network
     healthcheck:
@@ -33,31 +45,26 @@ services:
     restart: unless-stopped
 
   wordpress:
-    image: ${WORDPRESS_IMAGE_TAG}
+    image: *wordpress-image
     volumes:
-      - wordpress-data:${DATA_PATH}
+      - wordpress-data:${DATA_PATH:-/var/www/html}
     environment:
-      WORDPRESS_DATABASE_HOST: mariadb
-      WORDPRESS_DATABASE_PORT_NUMBER: 3306
-      WORDPRESS_DATABASE_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_DATABASE_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DATABASE_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX}
-      WORDPRESS_BLOG_NAME: ${WORDPRESS_BLOG_NAME}
-      WORDPRESS_FIRST_NAME: ${WORDPRESS_ADMIN_NAME}
-      WORDPRESS_LAST_NAME: ${WORDPRESS_ADMIN_LASTNAME}
-      WORDPRESS_USERNAME: ${WORDPRESS_ADMIN_USERNAME}
-      WORDPRESS_PASSWORD: ${WORDPRESS_ADMIN_PASSWORD}
-      WORDPRESS_EMAIL: ${WORDPRESS_ADMIN_EMAIL}
-      WORDPRESS_SMTP_HOST: ${WORDPRESS_SMTP_ADDRESS}
-      WORDPRESS_SMTP_PORT: ${WORDPRESS_SMTP_PORT}
-      WORDPRESS_SMTP_USER: ${WORDPRESS_SMTP_USER_NAME}
-      WORDPRESS_SMTP_PASSWORD: ${WORDPRESS_SMTP_PASSWORD}
+      WORDPRESS_DB_HOST: mariadb:3306
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-wordpressdb}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-wordpressdbbuser}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wpapp_}
+      # The site title and admin account are created in the WordPress
+      # web installer on first visit — the official image does not accept
+      # them via environment (the previous Bitnami image did; Bitnami's
+      # public images are frozen since Broadcom's 2025 catalog change).
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_ENVIRONMENT_TYPE', 'production');
     networks:
       - wordpress-network
       - traefik-network
     healthcheck:
-      test: timeout 10s bash -c ':> /dev/tcp/127.0.0.1/8080' || exit 1
+      test: timeout 10s bash -c ':> /dev/tcp/127.0.0.1/80' || exit 1
       interval: 10s
       timeout: 5s
       retries: 3
@@ -66,13 +73,13 @@ services:
       # Enable Traefik for this container
       - "traefik.enable=true"
       # Match incoming requests on a specific hostname
-      - "traefik.http.routers.wordpress.rule=Host(`${WORDPRESS_HOSTNAME}`)"
+      - "traefik.http.routers.wordpress.rule=Host(`${WORDPRESS_HOSTNAME:?set in .env - see .env.example}`)"
       # Assign the router to a named Traefik service
       - "traefik.http.routers.wordpress.service=wordpress"
       # Use the 'websecure' (HTTPS) entry point
       - "traefik.http.routers.wordpress.entrypoints=websecure"
       # Define the internal container port for routing
-      - "traefik.http.services.wordpress.loadbalancer.server.port=8080"
+      - "traefik.http.services.wordpress.loadbalancer.server.port=80"
       # Enable TLS on this router
       - "traefik.http.routers.wordpress.tls=true"
       # Use Let's Encrypt for certificate management
@@ -93,10 +100,10 @@ services:
         condition: service_healthy
 
   traefik:
-    image: ${TRAEFIK_IMAGE_TAG}
+    image: *traefik-image
     command:
       # Set the log level (DEBUG, INFO, WARN, ERROR)
-      - "--log.level=${TRAEFIK_LOG_LEVEL}"
+      - "--log.level=${TRAEFIK_LOG_LEVEL:-WARN}"
       # Enable the built-in API and web-based dashboard
       - "--api.dashboard=true"
       # Enable the /ping endpoint so we can health-check Traefik
@@ -121,7 +128,7 @@ services:
       # Use ACME (Let's Encrypt) to generate/renew certificates via TLS challenge
       - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
       # The email address used by Let's Encrypt for renewal notices
-      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL:?set in .env - see .env.example}"
       # The file where ACME certificates are stored inside the container
       - "--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json"
       # Enable Prometheus metrics
@@ -150,14 +157,14 @@ services:
       # Enable Traefik for this container
       - "traefik.enable=true"
       # A router to expose the Traefik dashboard
-      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_HOSTNAME}`)"
+      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_HOSTNAME:?set in .env - see .env.example}`)"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.tls=true"
       - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.routers.dashboard.service=api@internal"
       # Basic Authentication for the Traefik dashboard
       - "traefik.http.routers.dashboard.middlewares=authtraefik"
-      - "traefik.http.middlewares.authtraefik.basicauth.users=${TRAEFIK_BASIC_AUTH}"
+      - "traefik.http.middlewares.authtraefik.basicauth.users=${TRAEFIK_BASIC_AUTH:?set in .env - see .env.example for htpasswd generation}"
       # Specify the internal server port to the dashboard service
       - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
       # Pass the original Host header to the backend
@@ -174,34 +181,34 @@ services:
     restart: unless-stopped
 
   backups:
-    image: ${WORDPRESS_MARIADB_IMAGE_TAG}
+    image: *mariadb-image
     command: >-
-      sh -lc 'sleep $$BACKUP_INIT_SLEEP &&
+      sh -lc 'sleep $$$BACKUP_INIT_SLEEP &&
       while true; do
-        mariadb-dump -h mariadb -u $$WORDPRESS_DB_USER -p"$$WORDPRESS_DB_PASSWORD" $$WORDPRESS_DB_NAME |
-          gzip > "$$MARIADB_BACKUPS_PATH/$$MARIADB_BACKUP_NAME-$$(date +%Y-%m-%d_%H-%M).gz" &&
-        tar -zcpf "$$DATA_BACKUPS_PATH/$$DATA_BACKUP_NAME-$$(date +%Y-%m-%d_%H-%M).tar.gz" -C / "$${DATA_BACKUP_PATH#/}" &&
-        find $$MARIADB_BACKUPS_PATH -type f -mtime +$$MARIADB_BACKUP_PRUNE_DAYS -delete &&
-        find $$DATA_BACKUPS_PATH  -type f -mtime +$$DATA_BACKUP_PRUNE_DAYS  -delete;
-        sleep $$BACKUP_INTERVAL; done'
+        mariadb-dump -h mariadb -u $$$WORDPRESS_DB_USER -p"$$$WORDPRESS_DB_PASSWORD" $$$WORDPRESS_DB_NAME |
+          gzip > "$$$MARIADB_BACKUPS_PATH/$$$MARIADB_BACKUP_NAME-$$$(date +%Y-%m-%d_%H-%M).gz" &&
+        tar -zcpf "$$$DATA_BACKUPS_PATH/$$$DATA_BACKUP_NAME-$$$(date +%Y-%m-%d_%H-%M).tar.gz" -C / "$${DATA_BACKUP_PATH#/}" &&
+        find $$$MARIADB_BACKUPS_PATH -type f -mtime +$$$MARIADB_BACKUP_PRUNE_DAYS -delete &&
+        find $$$DATA_BACKUPS_PATH  -type f -mtime +$$$DATA_BACKUP_PRUNE_DAYS  -delete;
+        sleep $$$BACKUP_INTERVAL; done'
     volumes:
       - wordpress-mariadb-backup:/var/lib/mysql
-      - wordpress-data:${DATA_PATH}
-      - wordpress-data-backups:${DATA_BACKUPS_PATH}
-      - wordpress-database-backups:${MARIADB_BACKUPS_PATH}
+      - wordpress-data:${DATA_PATH:-/var/www/html}
+      - wordpress-data-backups:${DATA_BACKUPS_PATH:-/srv/wordpress-application-data/backups}
+      - wordpress-database-backups:${MARIADB_BACKUPS_PATH:-/srv/wordpress-mariadb/backups}
     environment:
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-wordpressdb}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-wordpressdbbuser}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      BACKUP_INIT_SLEEP: ${BACKUP_INIT_SLEEP}
-      BACKUP_INTERVAL: ${BACKUP_INTERVAL}
-      MARIADB_BACKUP_PRUNE_DAYS: ${MARIADB_BACKUP_PRUNE_DAYS}
-      DATA_BACKUP_PRUNE_DAYS: ${DATA_BACKUP_PRUNE_DAYS}
-      MARIADB_BACKUPS_PATH: ${MARIADB_BACKUPS_PATH}
-      DATA_BACKUPS_PATH: ${DATA_BACKUPS_PATH}
-      DATA_PATH: ${DATA_PATH}
-      MARIADB_BACKUP_NAME: ${MARIADB_BACKUP_NAME}
-      DATA_BACKUP_NAME: ${DATA_BACKUP_NAME}
+      BACKUP_INIT_SLEEP: ${BACKUP_INIT_SLEEP:-30m}
+      BACKUP_INTERVAL: ${BACKUP_INTERVAL:-24h}
+      MARIADB_BACKUP_PRUNE_DAYS: ${MARIADB_BACKUP_PRUNE_DAYS:-30}
+      DATA_BACKUP_PRUNE_DAYS: ${DATA_BACKUP_PRUNE_DAYS:-30}
+      MARIADB_BACKUPS_PATH: ${MARIADB_BACKUPS_PATH:-/srv/wordpress-mariadb/backups}
+      DATA_BACKUPS_PATH: ${DATA_BACKUPS_PATH:-/srv/wordpress-application-data/backups}
+      DATA_PATH: ${DATA_PATH:-/var/www/html}
+      MARIADB_BACKUP_NAME: ${MARIADB_BACKUP_NAME:-wordpress-mariadb-backup}
+      DATA_BACKUP_NAME: ${DATA_BACKUP_NAME:-wordpress-application-data-backup}
     networks:
       - wordpress-network
     restart: unless-stopped
