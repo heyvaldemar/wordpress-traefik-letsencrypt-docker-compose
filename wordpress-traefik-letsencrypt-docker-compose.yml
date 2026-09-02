@@ -27,6 +27,16 @@ volumes:
 services:
   mariadb:
     image: *mariadb-image
+    # Resource limits as .env-overridable defaults (e.g. WORDPRESS_MARIADB_MEMORY_LIMIT=2g);
+    # the override survives every git pull.
+    deploy:
+      resources:
+        limits:
+          memory: ${WORDPRESS_MARIADB_MEMORY_LIMIT:-1g}
+          cpus: "${WORDPRESS_MARIADB_CPU_LIMIT:-1.0}"
+        reservations:
+          memory: ${WORDPRESS_MARIADB_MEMORY_RESERVATION:-128m}
+          cpus: "${WORDPRESS_MARIADB_CPU_RESERVATION:-0.25}"
     volumes:
       - mariadb-data:/var/lib/mysql
     environment:
@@ -46,6 +56,16 @@ services:
 
   wordpress:
     image: *wordpress-image
+    # Resource limits as .env-overridable defaults (e.g. WORDPRESS_MEMORY_LIMIT=2g);
+    # the override survives every git pull.
+    deploy:
+      resources:
+        limits:
+          memory: ${WORDPRESS_MEMORY_LIMIT:-512m}
+          cpus: "${WORDPRESS_CPU_LIMIT:-1.0}"
+        reservations:
+          memory: ${WORDPRESS_MEMORY_RESERVATION:-64m}
+          cpus: "${WORDPRESS_CPU_RESERVATION:-0.25}"
     volumes:
       - wordpress-data:${DATA_PATH:-/var/www/html}
     environment:
@@ -101,6 +121,16 @@ services:
 
   traefik:
     image: *traefik-image
+    # Resource limits as .env-overridable defaults (e.g. TRAEFIK_MEMORY_LIMIT=2g);
+    # the override survives every git pull.
+    deploy:
+      resources:
+        limits:
+          memory: ${TRAEFIK_MEMORY_LIMIT:-256m}
+          cpus: "${TRAEFIK_CPU_LIMIT:-0.5}"
+        reservations:
+          memory: ${TRAEFIK_MEMORY_RESERVATION:-64m}
+          cpus: "${TRAEFIK_CPU_RESERVATION:-0.1}"
     command:
       # Set the log level (DEBUG, INFO, WARN, ERROR)
       - "--log.level=${TRAEFIK_LOG_LEVEL:-WARN}"
@@ -182,6 +212,16 @@ services:
 
   backups:
     image: *mariadb-image
+    # Resource limits as .env-overridable defaults (e.g. WORDPRESS_BACKUPS_MEMORY_LIMIT=2g);
+    # the override survives every git pull.
+    deploy:
+      resources:
+        limits:
+          memory: ${WORDPRESS_BACKUPS_MEMORY_LIMIT:-256m}
+          cpus: "${WORDPRESS_BACKUPS_CPU_LIMIT:-0.5}"
+        reservations:
+          memory: ${WORDPRESS_BACKUPS_MEMORY_RESERVATION:-32m}
+          cpus: "${WORDPRESS_BACKUPS_CPU_RESERVATION:-0.1}"
     command: >-
       bash -c 'set -o pipefail;
       sleep "$$BACKUP_INIT_SLEEP";

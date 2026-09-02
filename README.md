@@ -67,6 +67,10 @@ The weekly `check-pin-freshness` CI job re-resolves each pin against its registr
 
 The `backups` container runs a `mysqldump | gzip` + `tar.gz`-of-wp-content → prune → sleep loop (defaults: 30-minute warm-up, 24-hour interval, 30-day retention). Restore with the interactive scripts (`chmod +x *.sh` once): `./wordpress-restore-database.sh`, then `./wordpress-restore-application-data.sh`.
 
+## Resource limits
+
+Every service carries memory and CPU limits plus reservations as compose-level defaults — the same values CI boots the stack under. Override any of them in `.env` (the knobs and their defaults are listed in `.env.example`, e.g. `TRAEFIK_MEMORY_LIMIT=512m`) and the override survives every `git pull`. If a service is OOM-killed under real load, `docker inspect <container> --format '{{.State.OOMKilled}}'` says so; raise its `_MEMORY_LIMIT` and recreate.
+
 ## Testing
 
 The [Deployment Verification](https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml?query=branch%3Amain) workflow runs on every push, pull request, and every Monday at 06:00 UTC: shellcheck + actionlint, Trivy scans of all three pinned images, the weekly freshness check, and a deploy-and-test job that boots the full stack with ephemeral credentials and requires the site to answer through Traefik.
