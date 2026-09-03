@@ -51,7 +51,7 @@ _(no unreleased changes yet)_
 
 ### Added
 
-- **`tests/e2e-backup-restore.sh`** — seven end-to-end scenarios against
+- **`tests/e2e-backup-restore.sh`**: seven end-to-end scenarios against
   the live stack, run by CI on every push and by you locally: the
   required-variable guard fires, a backup is produced, it is a readable
   archive with real dump content (and a readable data `tar.gz` where the
@@ -94,11 +94,11 @@ v1.2.0.
 
 - **WordPress switched from `bitnami/wordpress:latest` to the official
   `wordpress:7.1.0` image.** Bitnami's public Docker Hub images have been
-  frozen since Broadcom's 2025 catalog change — the floating pin would
+  frozen since Broadcom's 2025 catalog change: the floating pin would
   have rotted forever. The official image uses different data paths
   (`/var/www/html` vs `/bitnami/wordpress`) and creates the admin via the
   web installer instead of environment variables. ❗ Existing deployments
-  cannot switch images in place — see the release notes for the
+  cannot switch images in place: see the release notes for the
   migration path (export content, fresh install, import).
 - **MariaDB 11.1 (EOL short-term line) → 11.4 LTS**, **Traefik 3.2 → 3.7**
   (3.2's Docker client cannot talk to Docker Engine 29).
@@ -108,7 +108,7 @@ v1.2.0.
 ### Security
 
 - **Credentials untracked from git.** The tracked `.env` carried
-  generated-looking database passwords — rotate them if reused.
+  generated-looking database passwords: rotate them if reused.
 
 ### Added
 
