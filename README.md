@@ -50,6 +50,8 @@ docker compose -p wordpress logs traefik | grep -i "adding certificate"
 
 Three upstream images ([`traefik`](https://hub.docker.com/_/traefik), [`wordpress`](https://hub.docker.com/_/wordpress), [`mariadb`](https://hub.docker.com/_/mariadb), all Docker Hub official) pinned to `tag@sha256:<digest>` as interpolation defaults in the compose `x-images` block. `git pull` alone delivers the tested combination; an `*_IMAGE_TAG` variable in `.env` overrides deliberately.
 
+Two override levels exist per image. `<PREFIX>_IMAGE_VERSION` in `.env` swaps only the version of that image (Compose then pulls the tag, without a digest) and leaves every other pin as tested; `<PREFIX>_IMAGE_TAG` replaces the whole reference, digest included. The variable names are listed in `.env.example`. Nested defaults need Docker Compose v2.5 or newer (2022); v2.0 to v2.4 leave the inner `${...}` unexpanded and `docker compose up` fails with an invalid reference instead of deploying something unexpected.
+
 Worth knowing: earlier versions of this template used `bitnami/wordpress:latest`. Bitnami's public images froze with Broadcom's 2025 catalog change, so the template now builds on the official image: see the v1.0.0 release notes if you deployed the Bitnami-based version.
 
 The daily `check-pin-freshness` CI job re-resolves each pin against its registry and compares the pinned WordPress and Traefik versions against the latest upstream releases. GitHub Actions are pinned by commit SHA; Dependabot keeps those fresh.
