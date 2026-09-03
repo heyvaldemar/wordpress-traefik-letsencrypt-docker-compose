@@ -3,7 +3,7 @@
 [![Deployment Verification](https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml/badge.svg?branch=main)](https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This repository deploys **WordPress** (official Docker image) behind **Traefik** with automatic **Let's Encrypt TLS**, backed by **MariaDB 11.4 LTS**, with scheduled **backups** (database + wp-content) and companion **restore scripts**. One `docker compose up` away from a website at `https://your-domain`.
+This repository deploys WordPress (official Docker image) behind Traefik with automatic Let's Encrypt TLS, backed by MariaDB 11.4 LTS, with scheduled backups (database + wp-content) and companion restore scripts. One `docker compose up` away from a website at `https://your-domain`.
 
 📙 Full narrative installation guide on the blog: [heyvaldemar.com/install-wordpress-using-docker-compose/](https://www.heyvaldemar.com/install-wordpress-using-docker-compose/).
 
@@ -29,7 +29,7 @@ $EDITOR .env
 docker compose -f wordpress-traefik-letsencrypt-docker-compose.yml -p wordpress up -d
 ```
 
-Within a minute `https://${WORDPRESS_HOSTNAME}` serves the WordPress installer with a fresh Let's Encrypt certificate. **Complete the installer immediately**: it creates the admin account, and the screen is open until someone claims it.
+Within a minute `https://${WORDPRESS_HOSTNAME}` serves the WordPress installer with a fresh Let's Encrypt certificate. Complete the installer immediately: it creates the admin account, and the screen is open until someone claims it.
 
 ### What success looks like
 
@@ -92,7 +92,7 @@ chmod +x tests/e2e-backup-restore.sh
 
 It stops the database container briefly to prove failure detection: run it on a staging copy, not on production.
 
-## Security Notes
+## Security notes
 
 - Credentials are read from `.env` at deploy time; `.env` is gitignored and compose fails fast on missing required variables.
 - **Pre-rotation advisory.** Releases before v1.0.0 (2026-08-31) shipped a tracked `.env` with generated-looking database passwords. Rotate them if your deployment reused them.
