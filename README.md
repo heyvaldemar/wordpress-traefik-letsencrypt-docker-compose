@@ -52,7 +52,7 @@ Three upstream images — [`traefik`](https://hub.docker.com/_/traefik), [`wordp
 
 Worth knowing: earlier versions of this template used `bitnami/wordpress:latest`. Bitnami's public images froze with Broadcom's 2025 catalog change, so the template now builds on the official image — see the v1.0.0 release notes if you deployed the Bitnami-based version.
 
-The weekly `check-pin-freshness` CI job re-resolves each pin against its registry and compares the pinned WordPress and Traefik versions against the latest upstream releases. GitHub Actions are pinned by commit SHA; Dependabot keeps those fresh.
+The daily `check-pin-freshness` CI job re-resolves each pin against its registry and compares the pinned WordPress and Traefik versions against the latest upstream releases. GitHub Actions are pinned by commit SHA; Dependabot keeps those fresh.
 
 ## Production checklist
 
@@ -73,7 +73,7 @@ Every service carries memory and CPU limits plus reservations as compose-level d
 
 ## Testing
 
-The [Deployment Verification](https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml?query=branch%3Amain) workflow runs on every push, pull request, and every Monday at 06:00 UTC: shellcheck + actionlint, Trivy scans of all three pinned images, the weekly freshness check, and a deploy-and-test job that boots the full stack with ephemeral credentials and requires the site to answer through Traefik.
+The [Deployment Verification](https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml?query=branch%3Amain) workflow runs on every push, pull request, and every day at 06:00 UTC: shellcheck + actionlint, Trivy scans of all three pinned images, the weekly freshness check, and a deploy-and-test job that boots the full stack with ephemeral credentials and requires the site to answer through Traefik.
 
 ### Backup and restore, proven
 
