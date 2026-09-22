@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(no unreleased changes yet)_
 
+## [1.9.0] - 2026-09-22
+
+### Fixed
+
+- **The www redirect never existed for anyone who deployed from `.env.example`.**
+  `WORDPRESS_ROOT_DOMAIN` was referenced by the `redirect-to-www` router and was
+  not in `.env.example`, so the rule rendered as ``Host(``)``. Traefik parses
+  that, builds the load balancer and the middleware chain, and then drops the
+  router at the last step with one line at debug level:
+  `error while checking rule Host: empty args for matcher Host, []`. Nothing
+  fails, no container is unhealthy, and `https://example.com` simply does not
+  redirect to `www`.
+
+### Changed
+
+- **`WORDPRESS_ROOT_DOMAIN` is now required** and carried in `.env.example`. An
+  empty value stops `docker compose up` naming the variable, instead of
+  producing a router that is silently discarded.
+
+  **Action required for existing deployments:** add `WORDPRESS_ROOT_DOMAIN` to
+  your `.env` — your site's hostname without the `www.`. `./update.sh` refuses
+  to move and names the variable before anything changes, so an update cannot
+  strand a running stack.
+
 ## [1.8.6] - 2026-09-21
 
 ### Security

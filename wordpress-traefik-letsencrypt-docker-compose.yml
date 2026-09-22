@@ -234,7 +234,11 @@ services:
       # Pass the original Host header to the backend
       - "traefik.http.services.dashboard.loadbalancer.passhostheader=true"
       # Redirect from non-www to www (permanent)
-      - "traefik.http.routers.redirect-to-www.rule=Host(`${WORDPRESS_ROOT_DOMAIN}`)"
+      # The apex this redirect comes FROM. Unset, the rule renders as Host(``)
+      # and Traefik drops the router after building it, with one line in a
+      # debug log as the only sign: "empty args for matcher Host". The guard
+      # turns that into a refusal to start, which is a thing somebody reads.
+      - "traefik.http.routers.redirect-to-www.rule=Host(`${WORDPRESS_ROOT_DOMAIN:?set in .env - see .env.example}`)"
       - "traefik.http.routers.redirect-to-www.entrypoints=websecure"
       - "traefik.http.routers.redirect-to-www.tls=true"
       - "traefik.http.routers.redirect-to-www.tls.certresolver=letsencrypt"
