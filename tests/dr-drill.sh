@@ -122,7 +122,10 @@ before() {
 after() {
   local t0 t1 tr to dbf dataf v dir
   t0="$(date +%s)"
-  to="$(git describe --tags --always 2>/dev/null || git rev-parse --short HEAD)"
+  # The release main carries: the newest tag whose stack is main's, or "main"
+  # when the stack has moved on since the last release.
+  to="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+  if [ -z "$to" ] || ! git diff --quiet "$to" HEAD -- "$DOCKER_COMPOSE_FILE"; then to="main"; fi
   MARK="$(cat "$OUT/marker")"
   cp "$OUT/env" .env
   say "a clean machine: starting $to empty"

@@ -55,16 +55,17 @@ jobs:
           fetch-depth: 0
 
       - name: The release this host was running
-        # The release before the one main carries, so the restore below crosses
-        # a version: an old backup brought back into the new release.
+        # The newest release whose stack differs from main's, so the restore
+        # below crosses a version: an old backup brought back into the release
+        # that replaced it. Picking by tag order alone chose main's own release
+        # whenever main carried a commit that did not touch the stack, and the
+        # first run "crossed" from v1.9.1 to v1.9.1.
         run: |
-          newest="$(git tag --sort=-v:refname --list 'v*' | head -n 1)"
-          if [ -n "$newest" ] && [ "$(git rev-list -n 1 "$newest")" = "$(git rev-parse HEAD)" ]; then
-            from="$(git tag --sort=-v:refname --list 'v*' | sed -n 2p)"
-          else
-            from="$newest"
-          fi
-          [ -n "$from" ] || { echo "::error::no earlier release to take the backup on"; exit 1; }
+          from=""
+          for t in $(git tag --sort=-v:refname --list 'v*'); do
+            if ! git diff --quiet "$t" HEAD -- "$DOCKER_COMPOSE_FILE"; then from="$t"; break; fi
+          done
+          [ -n "$from" ] || { echo "::error::no earlier release with a different stack to take the backup on"; exit 1; }
           echo "DR_FROM=$from" >> "$GITHUB_ENV"
           echo "the backup is taken on $from"
 
