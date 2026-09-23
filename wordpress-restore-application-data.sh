@@ -1,126 +1,64 @@
 #!/usr/bin/env bash
+# wordpress-restore-application-data.sh [backup-file-name]
+#
+# Replaces WordPress's application data with one of the archives the backups
+# service wrote.
+#
+#   ./wordpress-restore-application-data.sh               list and ask
+#   ./wordpress-restore-application-data.sh <file-name>   restore that one
+#
+# EVERY PATH, NAME AND CREDENTIAL COMES FROM THE RUNNING BACKUPS CONTAINER.
+# The previous version was written for the Bitnami image: it would only run
+# with RESTORE_PATH=/bitnami/wordpress/ and refused anything else, while this
+# stack runs the official image with its data at /var/www/html. It could not
+# restore this stack's data at all.
+# The backup loop reads its own environment, so this reads the same one, and
+# the two cannot disagree.
+#
+# CI runs this exact file against a marker written after the backup it
+# restores, and requires the marker to be gone.
+#
+# Set COMPOSE_PROJECT_NAME if the stack was started with a -p other than wordpress.
 set -Eeuo pipefail
-trap 'echo "[ERR] Line $LINENO"; exit 1' ERR
 
-# --- Configuration (override via env if needed) ---
-PROJECT=${PROJECT:-wordpress}          # Docker Compose project name
-SVC_WP=${SVC_WP:-wordpress}            # WordPress service name in docker-compose
-SVC_BKP=${SVC_BKP:-backups}            # Backups service name
+PROJECT="${COMPOSE_PROJECT_NAME:-wordpress}"
+APP_SERVICE="wordpress"
 
-APP_BACKUP_DIR=${APP_BACKUP_DIR:-/srv/wordpress-application-data/backups}
-
-# We restore the entire /bitnami/wordpress directory
-RESTORE_PATH=${RESTORE_PATH:-/bitnami/wordpress/}
-
-# Bitnami expects wp-config.php to be available in /opt/bitnami/wordpress
-WP_CONFIG_SRC=${WP_CONFIG_SRC:-/bitnami/wordpress/wp-config.php}
-WP_CONFIG_DST=${WP_CONFIG_DST:-/opt/bitnami/wordpress/wp-config.php}
-
-# --- Helper: find container by docker-compose labels ---
-find_by_labels () {
-  local project="$1" service="$2"
-  docker ps -aq \
-    --filter "label=com.docker.compose.project=${project}" \
-    --filter "label=com.docker.compose.service=${service}"
+cid() {  # the container of one compose service in this project
+  docker ps -aq --filter "label=com.docker.compose.project=$PROJECT" \
+    --filter "label=com.docker.compose.service=$1" | head -n 1
 }
+APP="$(cid "$APP_SERVICE")"; BKP="$(cid backups)"
+[ -n "$BKP" ] || { echo "error: no backups container in compose project '$PROJECT' (set COMPOSE_PROJECT_NAME)" >&2; exit 1; }
+[ -n "$APP" ] || { echo "error: no $APP_SERVICE container in compose project '$PROJECT'" >&2; exit 1; }
+[ "$(docker inspect -f '{{.State.Running}}' "$BKP")" = true ] || { echo "error: the backups container is not running" >&2; exit 1; }
 
-# --- Resolve container IDs ---
-CID_WP=$(find_by_labels "$PROJECT" "$SVC_WP" || true)
-CID_BKP=$(find_by_labels "$PROJECT" "$SVC_BKP" || true)
+env_of() { docker exec "$BKP" printenv "$1"; }
+DIR="$(env_of DATA_BACKUPS_PATH)"; NAME="$(env_of DATA_BACKUP_NAME)"; DATA="$(env_of DATA_PATH)"
+case "$DATA" in ""|/) echo "error: DATA_PATH is '$DATA'; refusing to clear it" >&2; exit 1 ;; esac
 
-[ -n "$CID_WP" ]  || CID_WP=$(docker compose -p "$PROJECT" ps -q --all "$SVC_WP" || true)
-[ -n "$CID_BKP" ] || CID_BKP=$(docker compose -p "$PROJECT" ps -q --all "$SVC_BKP" || true)
+SELECTED="${1:-}"
+if [ -z "$SELECTED" ]; then
+  echo "Application data backups in $DIR:"
+  docker exec "$BKP" sh -c "ls -1 '$DIR' | grep -E '^$NAME-.*\\.tar\\.gz\$'" || { echo "  none found" >&2; exit 1; }
+  read -r -p "File name to restore: " SELECTED
+fi
+case "$SELECTED" in ""|*/*) echo "error: give a file name from the list, not a path" >&2; exit 1 ;; esac
+docker exec "$BKP" tar -tzf "$DIR/$SELECTED" >/dev/null \
+  || { echo "error: $DIR/$SELECTED is missing or does not open; nothing was changed" >&2; exit 1; }
 
-[ -n "$CID_WP" ]  || CID_WP=$(docker ps -aqf "name=${PROJECT}-${SVC_WP}")
-[ -n "$CID_BKP" ] || CID_BKP=$(docker ps -aqf "name=${PROJECT}-${SVC_BKP}")
-
-echo "[DBG] PROJECT=${PROJECT} SVC_WP=${SVC_WP} SVC_BKP=${SVC_BKP}"
-echo "[DBG] CID_WP=${CID_WP:-<empty>} CID_BKP=${CID_BKP:-<empty>}"
-
-# --- Guards ---
-[ -n "$CID_WP" ]  || { echo "[ERR] WP container not found"; exit 1; }
-[ -n "$CID_BKP" ] || { echo "[ERR] Backups container not found"; exit 1; }
-
-# --- Check restore path exists inside backups container ---
-docker exec "$CID_BKP" sh -lc "test -d '${RESTORE_PATH}'" \
-  || { echo "[ERR] RESTORE_PATH does not exist inside backups container: ${RESTORE_PATH}"; exit 1; }
-
-# --- List available backups ---
-echo "--> Available application-data backups (full /bitnami/wordpress):"
-docker exec "$CID_BKP" sh -lc "ls -1 ${APP_BACKUP_DIR}/*.tar.gz 2>/dev/null || true"
-
-# --- Prompt user for archive filename ---
-read -r -p "--> Enter backup filename (e.g. wordpress-application-data-backup-YYYY-MM-DD_hh-mm.tar.gz): " SELECTED
-[ -n "$SELECTED" ] || { echo "[ERR] empty filename"; exit 1; }
-
-# --- Verify backup file exists ---
-docker exec "$CID_BKP" sh -lc "test -f '${APP_BACKUP_DIR}/${SELECTED}'" \
-  || { echo "[ERR] file not found: ${APP_BACKUP_DIR}/${SELECTED}"; exit 1; }
-
-# --- Ensure RESTORE_PATH is correct ---
-case "$RESTORE_PATH" in
-  */bitnami/wordpress/ ) : ;;
-  * ) echo "[ERR] RESTORE_PATH must be /bitnami/wordpress/: ${RESTORE_PATH}"; exit 1;;
-esac
-
-# --- Best-effort maintenance mode (requires wp-cli inside WP container) ---
-docker exec "$CID_WP" sh -lc "command -v wp >/dev/null && wp maintenance-mode activate || true" || true
-
-# --- Stop WP container before restore ---
-docker compose -p "$PROJECT" stop "$SVC_WP" || true
-
-# --- Perform restore inside backups container ---
-docker exec "$CID_BKP" sh -lc "
-  set -euo noglob
-  # Safety checks
-  test -d '${RESTORE_PATH}' && [ '${RESTORE_PATH}' != '/' ] && [ -n '${RESTORE_PATH}' ]
-  rm -rf '${RESTORE_PATH%/}'/*
-
-  # Archive contains bitnami/wordpress/... -> extract to /
-  tar -zxpf '${APP_BACKUP_DIR}/${SELECTED}' -C /
-
-  # Ensure no stray wp-config.php inside wp-content (defense-in-depth)
-  rm -f '${RESTORE_PATH}/wp-content/wp-config.php' 2>/dev/null || true
-"
-
-# --- Fix permissions (match Bitnami expectations) ---
-# wp-content should be owned by daemon:daemon, but wp-config.php must be root:root 440
-docker exec "$CID_BKP" sh -lc "
-  if [ -d '${RESTORE_PATH%/}/wp-content' ]; then
-    chown -R daemon:daemon '${RESTORE_PATH%/}/wp-content'
-  fi
-  if [ -f '${WP_CONFIG_SRC}' ]; then
-    chown root:root '${WP_CONFIG_SRC}'
-    chmod 440 '${WP_CONFIG_SRC}'
-  fi
-"
-
-# --- Start WP container again ---
-docker compose -p "$PROJECT" start "$SVC_WP" || true
-
-# --- Ensure wp-config.php symlink is in place ---
-echo "--> Ensuring wp-config symlink inside WP container..."
-ATTEMPTS=30
-SLEEP_SECS=2
-for i in $(seq 1 $ATTEMPTS); do
-  if docker exec "$CID_WP" sh -lc "[ -f '${WP_CONFIG_SRC}' ] && ln -sf '${WP_CONFIG_SRC}' '${WP_CONFIG_DST}' && ls -l '${WP_CONFIG_DST}'" >/dev/null 2>&1; then
-    echo "--> Symlink OK: ${WP_CONFIG_DST} -> ${WP_CONFIG_SRC}"
-    break
-  fi
-  echo "[DBG] WP not ready yet, retry ${i}/${ATTEMPTS}..."
-  sleep "$SLEEP_SECS"
-  docker compose -p "$PROJECT" start "$SVC_WP" >/dev/null 2>&1 || true
-done
-
-# --- Disable maintenance mode (best effort) ---
-docker exec "$CID_WP" sh -lc "command -v wp >/dev/null && wp maintenance-mode deactivate || true" || true
-
-# --- Final checks ---
-docker exec "$CID_WP" sh -lc "
-  echo '--> Post-checks:'
-  ls -ld /bitnami/wordpress /bitnami/wordpress/wp-content || true
-  [ -e '${WP_CONFIG_SRC}' ] && stat -c 'OK: %U:%G %a ${WP_CONFIG_SRC}' '${WP_CONFIG_SRC}' || echo 'WARN: wp-config.php missing at ${WP_CONFIG_SRC}'
-  [ -e '${WP_CONFIG_DST}' ] && echo 'OK: wp-config.php link exists at ${WP_CONFIG_DST}' || echo 'WARN: wp-config.php link missing at ${WP_CONFIG_DST}'
-" || true
-
-echo "--> Application data restore (full /bitnami/wordpress) completed successfully."
+echo "Stopping $APP_SERVICE so nothing writes while its data is replaced"
+docker stop "$APP" >/dev/null
+restart() { docker start "$APP" >/dev/null && echo "Started $APP_SERVICE"; }
+trap 'restart' EXIT
+echo "Restoring $SELECTED"
+# The archive holds the data directory relative to / (the loop writes it that
+# way), so it is extracted at /; what was there first is removed so files that
+# did not exist at backup time do not survive the restore.
+if ! docker exec "$BKP" sh -c "set -eu
+    find '$DATA' -mindepth 1 -delete
+    tar -xzpf '$DIR/$SELECTED' -C /"; then
+  echo "error: the restore failed part-way; $DATA may be incomplete. Restore another archive before using WordPress." >&2
+  exit 1
+fi
+echo "Restored $SELECTED into $DATA"
