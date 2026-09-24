@@ -36,19 +36,23 @@ jobs:
       APP_HOSTNAME: www.heyvaldemarwp.net
       APP_TRAEFIK_HOSTNAME: traefik.www.heyvaldemarwp.net
       COMPOSE_PROJECT_NAME: wordpress
-      APP_URL: https://$APP_HOSTNAME/
+      APP_URL: "https://$APP_HOSTNAME/"
       APP_OK: "200|302"
-      DB_ENGINE: mariadb
-      DB_HOST: mariadb
-      DB_NAME_ENV: WORDPRESS_DB_NAME
-      DB_USER_ENV: WORDPRESS_DB_USER
+      DB_ENGINE: "mariadb"
+      DB_HOST: "mariadb"
+      DB_NAME_ENV: "WORDPRESS_DB_NAME"
+      DB_USER_ENV: "WORDPRESS_DB_USER"
       DB_PASS_ENV: "WORDPRESS_DB_PASSWORD"
-      DB_DIR_ENV: MARIADB_BACKUPS_PATH
+      DB_DIR_ENV: "MARIADB_BACKUPS_PATH"
       DATA_DIR_ENV: "DATA_BACKUPS_PATH"
       DATA_PATH_ENV: "DATA_PATH"
-      DB_RESTORE: './wordpress-restore-database.sh "$F"'
-      DATA_RESTORE: './wordpress-restore-application-data.sh "$F"'
-      DR_DIAG: ''
+      DB_FILE_MATCH: ""
+      DATA_FILE_MATCH: ""
+      DB_RESTORE: "./wordpress-restore-database.sh \"$F\""
+      DATA_RESTORE: "./wordpress-restore-application-data.sh \"$F\""
+      DR_DIAG: ""
+      DR_IGNORE_SERVICES: ""
+      DR_KEEP: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,13 +64,16 @@ jobs:
         # below crosses a version: an old backup brought back into the release
         # that replaced it. Picking by tag order alone chose main's own release
         # whenever main carried a commit that did not touch the stack, and the
-        # first run "crossed" from v1.9.1 to v1.9.1.
+        # first run "crossed" from v1.9.1 to v1.9.1. A template whose every
+        # release runs the same stack drills its newest one: the host is still
+        # gone, and the page says from and to plainly.
         run: |
           from=""
           for t in $(git tag --sort=-v:refname --list 'v*'); do
             if ! git diff --quiet "$t" HEAD -- "$DOCKER_COMPOSE_FILE"; then from="$t"; break; fi
           done
-          [ -n "$from" ] || { echo "::error::no earlier release with a different stack to take the backup on"; exit 1; }
+          [ -n "$from" ] || from="$(git tag --sort=-v:refname --list 'v*' | head -n 1)"
+          [ -n "$from" ] || { echo "::error::no release to take the backup on"; exit 1; }
           echo "DR_FROM=$from" >> "$GITHUB_ENV"
           echo "the backup is taken on $from"
 
@@ -164,19 +171,23 @@ jobs:
       APP_HOSTNAME: www.heyvaldemarwp.net
       APP_TRAEFIK_HOSTNAME: traefik.www.heyvaldemarwp.net
       COMPOSE_PROJECT_NAME: wordpress
-      APP_URL: https://$APP_HOSTNAME/
+      APP_URL: "https://$APP_HOSTNAME/"
       APP_OK: "200|302"
-      DB_ENGINE: mariadb
-      DB_HOST: mariadb
-      DB_NAME_ENV: WORDPRESS_DB_NAME
-      DB_USER_ENV: WORDPRESS_DB_USER
+      DB_ENGINE: "mariadb"
+      DB_HOST: "mariadb"
+      DB_NAME_ENV: "WORDPRESS_DB_NAME"
+      DB_USER_ENV: "WORDPRESS_DB_USER"
       DB_PASS_ENV: "WORDPRESS_DB_PASSWORD"
-      DB_DIR_ENV: MARIADB_BACKUPS_PATH
+      DB_DIR_ENV: "MARIADB_BACKUPS_PATH"
       DATA_DIR_ENV: "DATA_BACKUPS_PATH"
       DATA_PATH_ENV: "DATA_PATH"
-      DB_RESTORE: './wordpress-restore-database.sh "$F"'
-      DATA_RESTORE: './wordpress-restore-application-data.sh "$F"'
-      DR_DIAG: ''
+      DB_FILE_MATCH: ""
+      DATA_FILE_MATCH: ""
+      DB_RESTORE: "./wordpress-restore-database.sh \"$F\""
+      DATA_RESTORE: "./wordpress-restore-application-data.sh \"$F\""
+      DR_DIAG: ""
+      DR_IGNORE_SERVICES: ""
+      DR_KEEP: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -187,6 +198,62 @@ jobs:
         run: |
           docker network create "$NETWORK_ONE" || true
           docker network create "$NETWORK_TWO" || true
+
+      - name: Generate test .env from .env.example, with ephemeral credentials
+        # FROM THE FILE USERS ARE TOLD TO COPY, NOT FROM A LIST KEPT HERE.
+        #
+        # This step used to write its own eight-line .env. That is a different
+        # deployment from the one the README describes, and the difference is
+        # invisible: on 2026-09-22 WORDPRESS_ROOT_DOMAIN was referenced by the
+        # www-redirect router, missing from .env.example, and present in this
+        # step — so every run was green while every deployment made from the
+        # documented file rendered the rule as Host(``), which Traefik parses,
+        # builds a load balancer for, and then discards with one line at debug
+        # level.
+        #
+        # Starting from .env.example means a variable that file forgets fails
+        # here, loudly, before anyone deploys it. Only the values CI must own
+        # are overridden: hostnames it controls, credentials that must be
+        # throwaway, and the backup timings that make the suite finish. No
+        # *_IMAGE_TAG values on purpose — the compose file's x-images defaults
+        # apply, so CI tests the pins the template ships.
+        run: |
+          cp .env.example .env
+          WORDPRESS_DB_PASSWORD_CI="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)" \
+          WORDPRESS_DB_ADMIN_PASSWORD_CI="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)" \
+          python3 - <<'PY'
+          import io, os
+
+          over = {
+              "TRAEFIK_ACME_EMAIL": "ci@example.com",
+              "TRAEFIK_HOSTNAME": os.environ["APP_TRAEFIK_HOSTNAME"],
+              "TRAEFIK_BASIC_AUTH": "traefikadmin:$$2y$$10$$sMzJfirKC75x/hVpiINeZOiSm.Jkity9cn4KwNkRvO7hSQVFc5FLO",
+              "WORDPRESS_DB_PASSWORD": os.environ["WORDPRESS_DB_PASSWORD_CI"],
+              "WORDPRESS_DB_ADMIN_PASSWORD": os.environ["WORDPRESS_DB_ADMIN_PASSWORD_CI"],
+              "WORDPRESS_HOSTNAME": os.environ["APP_HOSTNAME"],
+              "WORDPRESS_ROOT_DOMAIN": os.environ["APP_HOSTNAME"].split(".", 1)[1],
+              "BACKUP_INIT_SLEEP": "15s",
+              "BACKUP_INTERVAL": "60s",
+          }
+          lines = io.open(".env", encoding="utf-8").read().splitlines()
+          seen = set()
+          out = []
+          for line in lines:
+              key = line.split("=", 1)[0].strip() if "=" in line and not line.lstrip().startswith("#") else None
+              if key in over:
+                  out.append("%s=%s" % (key, over[key]))
+                  seen.add(key)
+              else:
+                  out.append(line)
+          # A key CI owns that the example file does not carry is still set, and
+          # said out loud: the example file is missing something CI needs.
+          for k, v in over.items():
+              if k not in seen:
+                  print("::warning::%s is not in .env.example; CI is supplying it" % k)
+                  out.append("%s=%s" % (k, v))
+          io.open(".env", "w", encoding="utf-8").write("\n".join(out) + "\n")
+          print("wrote .env from .env.example with %d overrides" % len(over))
+          PY
 
       - name: Modify /etc/hosts for internal routing
         run: |
