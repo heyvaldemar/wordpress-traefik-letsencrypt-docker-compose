@@ -6,9 +6,9 @@
 # CI (Trivy scans, check-pin-freshness, the ephemeral test .env) reads
 # the pins from these lines — this block is the single source of truth.
 x-images:
-  traefik: &traefik-image ${TRAEFIK_IMAGE_TAG:-traefik:${TRAEFIK_IMAGE_VERSION:-3.7@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0}}
+  traefik: &traefik-image ${TRAEFIK_IMAGE_TAG:-traefik:${TRAEFIK_IMAGE_VERSION:-3.7@sha256:b588cb566045e1ebb185948a8e2456f9705cb915b5f0fb5ee698184233997817}}
   mariadb: &mariadb-image ${WORDPRESS_MARIADB_IMAGE_TAG:-mariadb:${WORDPRESS_MARIADB_IMAGE_VERSION:-11.4@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6}}
-  wordpress: &wordpress-image ${WORDPRESS_IMAGE_TAG:-wordpress:${WORDPRESS_IMAGE_VERSION:-7.1.2@sha256:736761c95c327cb21602ab9175ee4dba6e779b00f3f4895536a3e1af5ac4fe4c}}
+  wordpress: &wordpress-image ${WORDPRESS_IMAGE_TAG:-wordpress:${WORDPRESS_IMAGE_VERSION:-7.1.2@sha256:e04cf657f24889e96b5544828cdd5a92a0b51819f3e1899183f9be6ea0485edf}}
 
 networks:
   wordpress-network:
