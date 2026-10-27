@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.10.13] - 2026-10-27
+
 ### Security
 
 - **`mariadb:11.4` was rebuilt upstream**; the pin moved from `sha256:250e1609e93c…` to `sha256:d1891ede5a55…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
@@ -376,7 +380,8 @@ v1.2.0.
 
 - Shellcheck findings in both restore scripts.
 
-[Unreleased]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.12...HEAD
+[Unreleased]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.13...HEAD
+[1.10.13]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.12...v1.10.13
 [1.10.12]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.11...v1.10.12
 [1.10.11]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.10...v1.10.11
 [1.10.10]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.9...v1.10.10
