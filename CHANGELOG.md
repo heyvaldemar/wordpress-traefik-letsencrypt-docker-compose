@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Security
+
+- **`wordpress:7.1.3` was rebuilt upstream**; the pin moved from `sha256:e5a724ec7ad9…` to `sha256:8901759bfbb7…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
 
 ## [1.10.13] - 2026-10-27
 
