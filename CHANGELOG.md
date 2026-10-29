@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.10.15] - 2026-10-29
+
 ### Changed
 
 - **`wordpress:7.1.3` moved to `wordpress:7.1.4`.** The freshness check reported the lag; the deploy job booted the stack on the new image before this landed.
@@ -388,7 +392,8 @@ v1.2.0.
 
 - Shellcheck findings in both restore scripts.
 
-[Unreleased]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.14...HEAD
+[Unreleased]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.15...HEAD
+[1.10.15]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.14...v1.10.15
 [1.10.14]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.13...v1.10.14
 [1.10.13]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.12...v1.10.13
 [1.10.12]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.11...v1.10.12
