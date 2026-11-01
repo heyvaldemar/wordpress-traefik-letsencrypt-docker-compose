@@ -63,7 +63,7 @@ The daily `check-pin-freshness` CI job re-resolves each pin against its registry
 
 ### Verify what you deploy
 
-Every release from v1.9.1 on carries three files made on GitHub's runner with a short-lived identity and no stored key: `wordpress-traefik-letsencrypt-docker-compose-<tag>.tar.gz`, a `git archive` of exactly the tree the tag points at; `wordpress-traefik-letsencrypt-docker-compose-<tag>.tar.gz.sigstore.json`, a keyless [Sigstore](https://www.sigstore.dev/) signature over it; and `wordpress-traefik-letsencrypt-docker-compose-<tag>.intoto.jsonl`, [SLSA](https://slsa.dev/) build provenance from the SLSA generator. To check them with nothing from this repository trusted:
+Every release from v1.10.17 on carries three files made on GitHub's runner with a short-lived identity and no stored key: `wordpress-traefik-letsencrypt-docker-compose-<tag>.tar.gz`, a `git archive` of exactly the tree the tag points at; `wordpress-traefik-letsencrypt-docker-compose-<tag>.tar.gz.sigstore.json`, a keyless [Sigstore](https://www.sigstore.dev/) signature over it; and `wordpress-traefik-letsencrypt-docker-compose-<tag>.intoto.jsonl`, [SLSA](https://slsa.dev/) build provenance from the SLSA generator. To check them with nothing from this repository trusted:
 
 ```bash
 cosign verify-blob wordpress-traefik-letsencrypt-docker-compose-<tag>.tar.gz \
