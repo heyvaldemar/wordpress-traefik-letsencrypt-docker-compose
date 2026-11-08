@@ -340,17 +340,26 @@ ps_sampler_stop() {
 test_dump_runs_without_password_in_argv() {
   # A write lock on a table the dump has to read keeps the dump waiting, so
   # its process can be read while the backup runs rather than guessed at.
-  local init hold locker since dump="" i ok="" hits_host hits_bkp id
+  local init hold locker since dump="" i ok="" hits_host hits_bkp id="" net img
   init=$(seconds_of "${BACKUP_INIT_SLEEP:-30m}")
   [[ "$init" -le 120 ]] || { fail "BACKUP_INIT_SLEEP is ${BACKUP_INIT_SLEEP:-30m}; this test needs a short one (CI uses 15s)"; return 1; }
   hold=$(( init + 75 ))
   db_query "CREATE TABLE IF NOT EXISTS zz_argv_probe (id int); INSERT INTO zz_argv_probe VALUES (1);" > /dev/null \
     || { fail "could not create the probe table"; return 1; }
-  # the lock is held from the database container: the backups one restarts below
-  docker exec -e MYSQL_PWD "$DB_CONTAINER" mariadb -h 127.0.0.1 -u "$DB_USER" "$DB_NAME" \
+  # The lock is held from a throwaway container of the backups image on the
+  # stack's network, the same way in as the dump: the backups container itself
+  # restarts below, and would take the session with it.
+  net="$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' "$BACKUPS_CONTAINER" | head -n 1)"
+  img="$(docker inspect -f '{{.Config.Image}}' "$BACKUPS_CONTAINER")"
+  docker run --rm --network "$net" --entrypoint mariadb -e MYSQL_PWD "$img" -h "$DB_HOST" -u "$DB_USER" "$DB_NAME" \
     -e "LOCK TABLES zz_argv_probe WRITE; SELECT SLEEP($hold); UNLOCK TABLES;" > /dev/null 2>&1 &
   locker=$!
-  sleep 3
+  for (( i = 0; i < 30; i++ )); do
+    id="$(db_query "SELECT id FROM information_schema.processlist WHERE info LIKE 'SELECT SLEEP(%' LIMIT 1;" | tr -d '[:space:]')"
+    [[ -n "$id" ]] && break
+    sleep 1
+  done
+  [[ -n "$id" ]] || { fail "the session holding the lock never started"; return 1; }
   since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "  restarting the backups service; its first dump waits on the lock"
   docker restart "$BACKUPS_CONTAINER" > /dev/null
@@ -361,8 +370,7 @@ test_dump_runs_without_password_in_argv() {
   done
   hits_host=$(ps -eo args= | argv_hits)
   hits_bkp=$(cmdlines_in "$BACKUPS_CONTAINER" | argv_hits)
-  id="$(db_query "SELECT id FROM information_schema.processlist WHERE info LIKE 'SELECT SLEEP(%' LIMIT 1;" | tr -d '[:space:]')"
-  [[ -z "$id" ]] || db_query "KILL $id;" > /dev/null 2>&1 || true
+  db_query "KILL $id;" > /dev/null 2>&1 || true
   wait "$locker" 2>/dev/null || true
   for (( i = 0; i < 120; i += 3 )); do
     ok="$(docker logs --since "$since" "$BACKUPS_CONTAINER" 2>&1 | grep -E "Database backup (OK|FAILED)" | head -n 1 || true)"
