@@ -7,6 +7,9 @@
 #   ./wordpress-restore-database.sh <file-name>   restore that one
 #
 # EVERY PATH, NAME AND CREDENTIAL COMES FROM THE RUNNING BACKUPS CONTAINER.
+# The password does not even leave it: the client reads MYSQL_PWD, set by the
+# shell inside, because an argument (docker exec -e NAME=value included) is
+# readable by every user on this host for as long as the restore runs.
 # The previous version kept its own copy of the backup directory, so a
 # MARIADB_BACKUPS_PATH set in .env left it listing a directory the loop never
 # wrote to, and it called wp-cli for maintenance mode, which the official
@@ -34,7 +37,7 @@ APP="$(cid "$APP_SERVICE")"; BKP="$(cid backups)"
 
 env_of() { docker exec "$BKP" printenv "$1"; }
 DIR="$(env_of MARIADB_BACKUPS_PATH)"; NAME="$(env_of MARIADB_BACKUP_NAME)"
-DB_NAME="$(env_of WORDPRESS_DB_NAME)"; DB_USER="$(env_of WORDPRESS_DB_USER)"; DB_PASS="$(env_of WORDPRESS_DB_PASSWORD)"
+DB_NAME="$(env_of WORDPRESS_DB_NAME)"; DB_USER="$(env_of WORDPRESS_DB_USER)"
 
 SELECTED="${1:-}"
 if [ -z "$SELECTED" ]; then
@@ -51,7 +54,8 @@ docker stop "$APP" >/dev/null
 restart() { docker start "$APP" >/dev/null && echo "Started $APP_SERVICE"; }
 trap 'restart' EXIT
 echo "Restoring $SELECTED"
-if ! docker exec -e MYSQL_PWD="$DB_PASS" "$BKP" sh -c "(set -o pipefail) 2>/dev/null && set -o pipefail; set -eu
+if ! docker exec "$BKP" sh -c "(set -o pipefail) 2>/dev/null && set -o pipefail; set -eu
+    MYSQL_PWD=\"\$WORDPRESS_DB_PASSWORD\"; export MYSQL_PWD
     mariadb -h mariadb -u '$DB_USER' -e 'DROP DATABASE IF EXISTS \`$DB_NAME\`; CREATE DATABASE \`$DB_NAME\`;'
     gunzip -c '$DIR/$SELECTED' | mariadb -h mariadb -u '$DB_USER' '$DB_NAME'"; then
   echo "error: the restore failed part-way. The database may now be empty: restore another backup before using WordPress." >&2
