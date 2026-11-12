@@ -8,7 +8,7 @@
 x-images:
   traefik: &traefik-image ${TRAEFIK_IMAGE_TAG:-traefik:${TRAEFIK_IMAGE_VERSION:-3.7@sha256:c1ea95f3b3eab04ba8868d201b8494e12284e424f7cec2127e3194bca1c6641c}}
   mariadb: &mariadb-image ${WORDPRESS_MARIADB_IMAGE_TAG:-mariadb:${WORDPRESS_MARIADB_IMAGE_VERSION:-11.4@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620}}
-  wordpress: &wordpress-image ${WORDPRESS_IMAGE_TAG:-wordpress:${WORDPRESS_IMAGE_VERSION:-7.1.4@sha256:6888208af0e3cb93af427c13a434273b07ba353ce9e2d5a29abe3031bb28ea3a}}
+  wordpress: &wordpress-image ${WORDPRESS_IMAGE_TAG:-wordpress:${WORDPRESS_IMAGE_VERSION:-7.1.4@sha256:ff7acd964e36e96275a28bae64774212ee381417c754c6b82251d51c5cc91608}}
 
 networks:
   wordpress-network:
