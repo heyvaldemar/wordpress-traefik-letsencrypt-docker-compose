@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.10.31] - 2026-11-25
+
 ### Security
 
 - **`wordpress:7.1.5` was rebuilt upstream**; the pin moved from `sha256:637eaaa925da…` to `sha256:9b46af6a41fd…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
@@ -490,7 +494,8 @@ v1.2.0.
 
 - Shellcheck findings in both restore scripts.
 
-[Unreleased]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.30...HEAD
+[Unreleased]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.31...HEAD
+[1.10.31]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.30...v1.10.31
 [1.10.30]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.29...v1.10.30
 [1.10.29]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.28...v1.10.29
 [1.10.28]: https://github.com/heyvaldemar/wordpress-traefik-letsencrypt-docker-compose/compare/v1.10.27...v1.10.28
